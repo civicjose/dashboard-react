@@ -3,10 +3,11 @@
 export default {
     content: [
         "./index.html",
-        "./src/**/*.{js,ts,jsx,tsx}", // No usamos TypeScript pero por si acaso :D
+        "./src/**/*.{js,ts,jsx,tsx}",
     ],
+    darkMode: 'class',
     theme: {
         extend: {},
     },
-    plugins: [], //  !!!
+    plugins: [],
 }
