@@ -6,7 +6,10 @@ import DashboardPage from './pages/DashboardPage';
 import IndicadoresPage from './pages/IndicadoresPage'; 
 import Layout from './components/Layout';
 
-// Componente guardián para proteger rutas
+// CAMBIO: Importamos la librería y sus estilos
+import { Tooltip } from 'react-tooltip';
+import 'react-tooltip/dist/react-tooltip.css';
+
 const ProtectedRoute = () => {
   const { isAuthenticated } = useAuth();
   return isAuthenticated ? <Layout /> : <Navigate to="/" replace />;
@@ -24,9 +27,15 @@ function App() {
             <Route path="/indicadores" element={<IndicadoresPage />} />
           </Route>
 
-          {/* Si se entra a una ruta no definida, redirigir a dashboard si está logueado, o a login si no */}
           <Route path="*" element={<Navigate to="/" />} /> 
         </Routes>
+        
+        {/* CAMBIO: Añadimos el componente Tooltip aquí. 
+            Le damos un id y un estilo base para el modo oscuro. */}
+        <Tooltip 
+          id="app-tooltip" 
+          style={{ backgroundColor: "rgb(31 41 55)", color: "#fff" }}
+        />
       </Router>
     </AuthProvider>
   );

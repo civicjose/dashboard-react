@@ -1,45 +1,115 @@
 import { pool } from '../config/db.js';
-import { laborMinutes, toHHMM } from '../utils/laborTime.js';
+import { calculateBusinessMinutes, toHHMM } from '../utils/laborTime.js';
 
-export async function getIndicadores(fiStart, ffEnd, profiles) {
-  const db = await pool.getConnection();
+export async function getIndicadores(desde, hasta, profileIds, groupIds) {
+  const conn = await pool.getConnection();
+  const effectiveGroupIds = groupIds.length > 0 ? groupIds : [-1];
+
   try {
-    const GLPI = 'https://sistemas.macrosad.com/front/ticket.php?reset=reset';
-    const rangeCre = (fi, ff) => `&criteria[0][field]=15&criteria[0][searchtype]=morethan&criteria[0][value]=${fi}&criteria[1][link]=AND&criteria[1][field]=15&criteria[1][searchtype]=lessthan&criteria[1][value]=${ff}`;
-    const rangeSolvClos = (fi, ff) => `&criteria[0][field]=12&criteria[0][searchtype]=equals&criteria[0][value]=5&criteria[1][link]=AND&criteria[1][field]=17&criteria[1][searchtype]=morethan&criteria[1][value]=${fi}&criteria[2][link]=AND&criteria[2][field]=17&criteria[2][searchtype]=lessthan&criteria[2][value]=${ff}&criteria[3][link]=OR&criteria[3][field]=12&criteria[3][searchtype]=equals&criteria[3][value]=6&criteria[4][link]=AND&criteria[4][field]=17&criteria[4][searchtype]=morethan&criteria[4][value]=${fi}&criteria[5][link]=AND&criteria[5][field]=17&criteria[5][searchtype]=lessthan&criteria[5][value]=${ff}`;
+    // Consulta 1: Tickets Creados
+    const [statsCreados] = await conn.query(
+      `SELECT COUNT(id) AS creados_total, SUM(CASE WHEN type = 1 THEN 1 ELSE 0 END) AS creados_incidencias, SUM(CASE WHEN type = 2 THEN 1 ELSE 0 END) AS creados_peticiones FROM glpi_tickets WHERE DATE(date) BETWEEN ? AND ? AND is_deleted = 0`,
+      [desde, hasta]
+    );
 
-    const [cre] = await db.query(`SELECT COUNT(*) AS total, SUM(type=1) AS incid, SUM(type=2) AS pet FROM glpi_tickets WHERE is_deleted=0 AND date BETWEEN ? AND ?`, [fiStart, ffEnd]);
-    const creados = { total_creadas: cre[0].total, incidencias_creadas: cre[0].incid, peticiones_creadas: cre[0].pet, url_total: GLPI + rangeCre(fiStart, ffEnd), url_incid: GLPI + rangeCre(fiStart, ffEnd) + '&criteria[2][link]=AND&criteria[2][field]=14&criteria[2][searchtype]=equals&criteria[2][value]=1', url_pet: GLPI + rangeCre(fiStart, ffEnd) + '&criteria[2][link]=AND&criteria[2][field]=14&criteria[2][searchtype]=equals&criteria[2][value]=2' };
+    // Consulta 2: Tickets Resueltos
+    const [statsResueltos] = await conn.query(
+      `SELECT COUNT(t.id) AS resueltos_total, SUM(CASE WHEN t.type = 1 THEN 1 ELSE 0 END) AS resueltos_incidencias, SUM(CASE WHEN t.type = 2 THEN 1 ELSE 0 END) AS resueltos_peticiones FROM glpi_tickets t LEFT JOIN glpi_tickets_users tu ON tu.tickets_id = t.id AND tu.type = 2 LEFT JOIN glpi_profiles_users pu ON pu.users_id = tu.users_id LEFT JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id WHERE DATE(t.solvedate) BETWEEN ? AND ? AND t.is_deleted = 0 AND (pu.profiles_id IN (?) OR gt.groups_id IN (?))`,
+      [desde, hasta, profileIds, effectiveGroupIds]
+    );
 
-    const [res] = await db.query(`SELECT COUNT(DISTINCT t.id) AS total, COUNT(DISTINCT CASE WHEN t.type=1 THEN t.id END) AS incid, COUNT(DISTINCT CASE WHEN t.type=2 THEN t.id END) AS pet FROM glpi_tickets t JOIN glpi_tickets_users tu ON tu.tickets_id=t.id AND tu.type=2 JOIN glpi_profiles_users pu ON pu.users_id=tu.users_id WHERE t.is_deleted=0 AND pu.profiles_id IN (?) AND t.status IN (5,6) AND IFNULL(t.solvedate,t.closedate) BETWEEN ? AND ?`, [profiles, fiStart, ffEnd]);
-    const [tecRows] = await db.query(`SELECT u.firstname AS tec, tu.users_id AS id, COUNT(DISTINCT t.id) AS tot FROM glpi_tickets t JOIN glpi_tickets_users tu ON tu.tickets_id=t.id AND tu.type=2 JOIN glpi_users u ON u.id=tu.users_id JOIN glpi_profiles_users pu ON pu.users_id=u.id WHERE t.is_deleted=0 AND pu.profiles_id IN (?) AND t.status IN (5,6) AND IFNULL(t.solvedate,t.closedate) BETWEEN ? AND ? GROUP BY tu.users_id`, [profiles, fiStart, ffEnd]);
-    const tecSum = tecRows.reduce((s, r) => s + r.tot, 0);
-    const porTec = tecRows.map(r => ({ tecnico: r.tec, total: r.tot, porcentaje: tecSum ? +(r.tot * 100 / tecSum).toFixed(1) : 0, url: GLPI + rangeSolvClos(fiStart, ffEnd) + `&criteria[6][link]=AND&criteria[6][field]=5&criteria[6][searchtype]=equals&criteria[6][value]=${r.id}` }));
-    const resueltos = { total_resueltos: res[0].total, incidencias_resueltas: res[0].incid, peticiones_resueltas: res[0].pet, resueltos_por_tecnico: porTec, url_total: GLPI + rangeSolvClos(fiStart, ffEnd), url_incid: GLPI + rangeSolvClos(fiStart, ffEnd) + '&criteria[6][link]=AND&criteria[6][field]=14&criteria[6][searchtype]=equals&criteria[6][value]=1', url_pet: GLPI + rangeSolvClos(fiStart, ffEnd) + '&criteria[6][link]=AND&criteria[6][field]=14&criteria[6][searchtype]=equals&criteria[2][value]=2' };
+    const statsTickets = { ...statsCreados[0], ...statsResueltos[0] };
 
-    const [timeRows] = await db.query(`SELECT t.type, t.date, IFNULL(t.solvedate,t.closedate) AS fin FROM glpi_tickets t JOIN glpi_tickets_users tu ON tu.tickets_id=t.id AND tu.type=2 JOIN glpi_profiles_users pu ON pu.users_id=tu.users_id WHERE t.is_deleted=0 AND pu.profiles_id IN (?) AND t.status IN (5,6) AND IFNULL(t.solvedate,t.closedate) BETWEEN ? AND ?`, [profiles, fiStart, ffEnd]);
-    let sT=0,sI=0,sP=0,cT=0,cI=0,cP=0;
-    for (const r of timeRows) {
-      const m = laborMinutes(r.date, r.fin);
-      sT += m; ++cT;
-      if (r.type === 1) { sI += m; ++cI; }
-      if (r.type === 2) { sP += m; ++cP; }
+    // Consulta 3: Resueltos por Técnico (con ID)
+    const [resueltosPorTecnico] = await conn.query(
+      `SELECT u.id, u.firstname, u.realname, COUNT(t.id) as total FROM glpi_tickets t JOIN glpi_tickets_users tu ON t.id = tu.tickets_id AND tu.type = 2 JOIN glpi_users u ON tu.users_id = u.id JOIN glpi_profiles_users pu ON u.id = pu.users_id WHERE DATE(t.solvedate) BETWEEN ? AND ? AND t.is_deleted = 0 AND pu.profiles_id IN (?) GROUP BY u.id, u.firstname, u.realname ORDER BY total DESC`,
+      [desde, hasta, profileIds]
+    );
+    
+    // Consultas y Lógica para Tiempos de Resolución
+    const [ticketsResueltos] = await conn.query(
+      `SELECT t.id, t.type, t.date as date_creation, t.solvedate FROM glpi_tickets t LEFT JOIN glpi_tickets_users tu ON tu.tickets_id = t.id AND tu.type = 2 LEFT JOIN glpi_profiles_users pu ON pu.users_id = tu.users_id LEFT JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id WHERE DATE(t.solvedate) BETWEEN ? AND ? AND t.is_deleted = 0 AND (pu.profiles_id IN (?) OR gt.groups_id IN (?))`,
+      [desde, hasta, profileIds, effectiveGroupIds]
+    );
+    
+    const ticketIds = ticketsResueltos.map(t => t.id);
+    let logs = [];
+    if (ticketIds.length > 0) {
+      const [logRows] = await conn.query(
+        `SELECT items_id as ticket_id, date_mod as timestamp, new_value as status_id FROM glpi_logs WHERE items_id IN (?) AND itemtype = 'Ticket' AND id_search_option = 12 ORDER BY items_id, date_mod ASC`,
+        [ticketIds]
+      );
+      logs = logRows;
     }
-    const tiempos = { tiempo_medio_total: cT ? toHHMM(Math.round(sT / cT)) : '-', tiempo_medio_incidencias: cI ? toHHMM(Math.round(sI / cI)) : '-', tiempo_medio_peticiones: cP ? toHHMM(Math.round(sP / cP)) : '-' };
 
-    const [reab] = await db.query(`SELECT DISTINCT t.id, t.name, t.status, (SELECT u.firstname FROM glpi_tickets_users tu JOIN glpi_users u ON u.id=tu.users_id WHERE tu.tickets_id=t.id AND tu.type=2 LIMIT 1) AS tec FROM glpi_tickets t JOIN glpi_logs l ON l.itemtype='Ticket' AND l.items_id=t.id WHERE t.is_deleted=0 AND l.date_mod BETWEEN ? AND ? AND l.id_search_option=12 AND l.old_value IN ('5','6') AND l.new_value IN ('1','2','3','4')`, [fiStart, ffEnd]);
-    const reabiertos = { total_reabiertos: reab.length, detalle: reab.map(r => ({ id: r.id, titulo: r.name, estado: r.status, tecnico: r.tec, url: `/front/ticket.form.php?id=${r.id}` })) };
+    let totalMinutesIncidencias = 0, countIncidencias = 0, totalMinutesPeticiones = 0, countPeticiones = 0;
+    for (const ticket of ticketsResueltos) {
+        const ticketLogs = logs.filter(l => l.ticket_id === ticket.id);
+        let totalBusinessMinutes = calculateBusinessMinutes(ticket.date_creation, ticket.solvedate);
+        let pausedMinutes = 0;
+        for (let i = 0; i < ticketLogs.length; i++) {
+            const currentLog = ticketLogs[i];
+            const currentStatus = parseInt(currentLog.status_id, 10);
+            if (currentStatus === 4) {
+                const startPause = currentLog.timestamp;
+                const endPause = (i + 1 < ticketLogs.length) ? ticketLogs[i+1].timestamp : ticket.solvedate;
+                pausedMinutes += calculateBusinessMinutes(startPause, endPause);
+            }
+        }
+        const realResolutionMinutes = totalBusinessMinutes - pausedMinutes;
+        if (ticket.type === 1) { totalMinutesIncidencias += realResolutionMinutes; countIncidencias++; } 
+        else if (ticket.type === 2) { totalMinutesPeticiones += realResolutionMinutes; countPeticiones++; }
+    }
+    const avgIncidencias = countIncidencias > 0 ? totalMinutesIncidencias / countIncidencias : NaN;
+    const avgPeticiones = countPeticiones > 0 ? totalMinutesPeticiones / countPeticiones : NaN;
+    const avgTotal = (countIncidencias + countPeticiones) > 0 ? (totalMinutesIncidencias + totalMinutesPeticiones) / (countIncidencias + countPeticiones) : NaN;
+    const tiemposFormateados = { tiempo_medio_total: toHHMM(avgTotal), tiempo_medio_incidencias: toHHMM(avgIncidencias), tiempo_medio_peticiones: toHHMM(avgPeticiones) };
 
-    const [catRows] = await db.query(`SELECT c.id, c.completename AS cat, COUNT(*) AS qty FROM glpi_tickets t JOIN glpi_itilcategories c ON c.id=t.itilcategories_id JOIN glpi_tickets_users tu ON tu.tickets_id=t.id AND tu.type=2 JOIN glpi_profiles_users pu ON pu.users_id=tu.users_id WHERE t.is_deleted=0 AND pu.profiles_id IN (?) AND t.status IN (5,6) AND IFNULL(t.solvedate,t.closedate) BETWEEN ? AND ? GROUP BY c.id`, [profiles, fiStart, ffEnd]);
-    const catTotal = catRows.reduce((s, r) => s + r.qty, 0);
-    const por_categoria = catRows.map(r => ({ categoria: r.cat || 'Sin categoría', cantidad: r.qty, porcentaje: catTotal ? +(r.qty * 100 / catTotal).toFixed(1) : 0, url: GLPI + rangeSolvClos(fiStart, ffEnd) + `&criteria[6][link]=AND&criteria[6][field]=7&criteria[6][searchtype]=equals&criteria[6][value]=${r.id}` }));
+    // Consultas para Reabiertos
+    const [reopenedLogs] = await conn.query(`SELECT DISTINCT l.items_id FROM glpi_logs l JOIN glpi_tickets t ON t.id = l.items_id LEFT JOIN glpi_tickets_users tu ON tu.tickets_id = t.id AND tu.type = 2 LEFT JOIN glpi_users u ON u.id = tu.users_id LEFT JOIN glpi_profiles_users pu ON pu.users_id = u.id WHERE l.itemtype = 'Ticket' AND l.id_search_option = 12 AND l.old_value IN ('5', '6') AND l.new_value IN ('1','2','3','4') AND DATE(l.date_mod) BETWEEN ? AND ? AND (pu.profiles_id IN (?) OR tu.users_id IS NULL)`, [desde, hasta, profileIds]);
+    const reopenedTicketIds = reopenedLogs.map(r => r.items_id);
+    let reabiertos = [], reabiertosPorTecnico = [];
+    if (reopenedTicketIds.length > 0) {
+      [reabiertos] = await conn.query(`SELECT t.id, t.name as titulo, t.status, u.firstname, u.realname FROM glpi_tickets t LEFT JOIN glpi_tickets_users tu ON tu.tickets_id = t.id AND tu.type = 2 LEFT JOIN glpi_users u ON u.id = tu.users_id WHERE t.id IN (?)`, [reopenedTicketIds]);
+      [reabiertosPorTecnico] = await conn.query(`SELECT u.id, u.firstname, u.realname, COUNT(t.id) as total FROM glpi_tickets t JOIN glpi_tickets_users tu ON tu.tickets_id = t.id AND tu.type = 2 JOIN glpi_users u ON u.id = tu.users_id WHERE t.id IN (?) GROUP BY u.id, u.firstname, u.realname ORDER BY total DESC`, [reopenedTicketIds]);
+    }
+    
+    // Consultas para Categorías y Etiquetas (con IDs)
+    const [porCategoria] = await conn.query(`SELECT c.id, c.completename as nombre, COUNT(t.id) as total FROM glpi_tickets t JOIN glpi_itilcategories c ON t.itilcategories_id = c.id LEFT JOIN glpi_tickets_users tu ON tu.tickets_id = t.id AND tu.type = 2 LEFT JOIN glpi_profiles_users pu ON pu.users_id = tu.users_id LEFT JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id WHERE DATE(t.solvedate) BETWEEN ? AND ? AND t.is_deleted = 0 AND (pu.profiles_id IN (?) OR gt.groups_id IN (?)) GROUP BY c.id, c.completename ORDER BY total DESC`, [desde, hasta, profileIds, effectiveGroupIds]);
+    const [porEtiqueta] = await conn.query(`SELECT tag.id, tag.name as nombre, COUNT(t.id) as total FROM glpi_tickets t JOIN glpi_plugin_tag_tagitems ti ON t.id = ti.items_id AND ti.itemtype = 'Ticket' JOIN glpi_plugin_tag_tags tag ON ti.plugin_tag_tags_id = tag.id LEFT JOIN glpi_tickets_users tu ON tu.tickets_id = t.id AND tu.type = 2 LEFT JOIN glpi_profiles_users pu ON tu.users_id = tu.users_id LEFT JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id WHERE DATE(t.solvedate) BETWEEN ? AND ? AND t.is_deleted = 0 AND (pu.profiles_id IN (?) OR gt.groups_id IN (?)) GROUP BY tag.id, tag.name ORDER BY total DESC`, [desde, hasta, profileIds, effectiveGroupIds]);
 
-    const [tagRows] = await db.query(`SELECT tg.id, tg.name AS tag, COUNT(DISTINCT t.id) AS qty FROM glpi_tickets t JOIN glpi_plugin_tag_tagitems ti ON ti.itemtype='Ticket' AND ti.items_id=t.id JOIN glpi_plugin_tag_tags tg ON tg.id=ti.plugin_tag_tags_id JOIN glpi_tickets_users tu ON tu.tickets_id=t.id AND tu.type=2 JOIN glpi_profiles_users pu ON pu.users_id=tu.users_id WHERE t.is_deleted=0 AND pu.profiles_id IN (?) AND t.status IN (5,6) AND IFNULL(t.solvedate,t.closedate) BETWEEN ? AND ? GROUP BY tg.id ORDER BY qty DESC`, [profiles, fiStart, ffEnd]);
-    const tagTotal = tagRows.reduce((s, r) => s + r.qty, 0);
-    const por_etiqueta = tagRows.map(r => ({ etiqueta: r.tag || 'Sin etiqueta', cantidad: r.qty, porcentaje: tagTotal ? +(r.qty * 100 / tagTotal).toFixed(1) : 0, url: GLPI + rangeSolvClos(fiStart, ffEnd) + `&criteria[6][link]=AND&criteria[6][field]=10500&criteria[6][searchtype]=equals&criteria[6][value]=${r.id}` }));
-
-    return { tickets_creados: creados, tickets_resueltos: resueltos, tiempos_resolucion: tiempos, reabiertos, por_categoria, por_etiqueta };
+    return {
+      statsTickets,
+      resueltosPorTecnico,
+      tiempos: tiemposFormateados,
+      reabiertos,
+      reabiertosPorTecnico,
+      porCategoria,
+      porEtiqueta,
+    };
   } finally {
-    db.release();
+    conn.release();
+  }
+}
+
+export async function getTecnicoDetalle(tecnicoId, desde, hasta) {
+  const conn = await pool.getConnection();
+  try {
+    const [detalle] = await conn.query(
+      `
+      SELECT 
+        SUM(CASE WHEN t.type = 1 THEN 1 ELSE 0 END) AS incidencias,
+        SUM(CASE WHEN t.type = 2 THEN 1 ELSE 0 END) AS peticiones
+      FROM glpi_tickets t
+      JOIN glpi_tickets_users tu ON t.id = tu.tickets_id AND tu.type = 2
+      WHERE tu.users_id = ?
+        AND DATE(t.solvedate) BETWEEN ? AND ?
+        AND t.is_deleted = 0
+      `,
+      [tecnicoId, desde, hasta]
+    );
+    return detalle[0];
+  } finally {
+    conn.release();
   }
 }

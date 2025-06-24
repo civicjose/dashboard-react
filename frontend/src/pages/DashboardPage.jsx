@@ -39,8 +39,7 @@ const DashboardPage = () => {
     return () => clearInterval(intervalId);
   }, [profile]);
 
-  const FilterButtons = () => (
-    // Dark mode: El fondo de los botones y el texto del hover cambian
+ const FilterButtons = () => (
     <div className="flex space-x-1 bg-gray-200 dark:bg-gray-700 p-1 rounded-full">
       {['all', 'l1', 'l2'].map(p => (
         <button
@@ -50,7 +49,8 @@ const DashboardPage = () => {
             setData(null);
             setProfile(p);
           }}
-          className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors ${
+          // CAMBIO: Se ha eliminado 'transition-colors'
+          className={`px-5 py-2 text-sm font-semibold rounded-full ${
             profile === p 
               ? 'bg-white dark:bg-gray-900 text-indigo-700 dark:text-indigo-400 shadow-sm' 
               : 'text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-gray-600'

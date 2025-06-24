@@ -6,15 +6,13 @@ const SecondaryKPI = ({ label, value, link }) => (
       href={value > 0 ? link : undefined} 
       target="_blank" 
       rel="noopener noreferrer" 
-      // Dark mode: Hover y colores de texto
-      className={`flex justify-between items-center py-2 text-sm transition-colors ${
+      className={`flex justify-between items-center py-2 text-sm ${
         value > 0 
           ? 'hover:bg-slate-100 dark:hover:bg-gray-700 px-2 -mx-2 rounded-md' 
           : 'opacity-50 cursor-default'
       }`}
     >
       <span className="text-gray-600 dark:text-gray-300">{label}</span>
-      {/* Dark mode: Fondo y texto de la "píldora" con el número */}
       <span className="font-semibold text-gray-800 dark:text-gray-100 bg-slate-100 dark:bg-gray-600 px-2 py-0.5 rounded-full">{value}</span>
     </a>
 );
@@ -24,13 +22,10 @@ const TechnicianCard = ({ tecnico }) => {
   const profileImageUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(tecnico.firstname)}+${encodeURIComponent(tecnico.lastname)}&background=e0e7ff&color=4f46e5&font-size=0.33`;
 
   return (
-    // Dark mode: Fondo de la tarjeta
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden flex flex-col transition-shadow hover:shadow-xl duration-300 h-full">
-      {/* Dark mode: Fondo y borde de la cabecera */}
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden flex flex-col hover:shadow-xl h-full">
       <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 flex items-center gap-4">
         <img src={profileImageUrl} alt={`Foto de ${tecnico.firstname}`} className="w-14 h-14 rounded-full border-2 border-indigo-200 dark:border-indigo-500 object-cover"/>
         <div className="flex-1 min-w-0">
-          {/* Dark mode: Texto y hover del nombre */}
           <a href={GLPI_USER_URL} target="_blank" rel="noopener noreferrer" className="text-base font-bold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 truncate block">
             {tecnico.firstname} {tecnico.lastname}
           </a>
@@ -38,7 +33,6 @@ const TechnicianCard = ({ tecnico }) => {
       </div>
       
       <div className="grid grid-cols-3 gap-1 p-4">
-          {/* Dark mode: Colores del hover */}
           <a href={tecnico.resueltos_hoy > 0 ? generateGlpiUrl({ ticketIds: tecnico.resueltos_hoy_ids }) : undefined} target="_blank" rel="noopener noreferrer" className={`flex flex-col items-center p-2 rounded-lg ${tecnico.resueltos_hoy > 0 ? 'hover:bg-green-50 dark:hover:bg-green-500/10 text-green-600' : 'opacity-50 text-green-600/50'}`}>
               <div className="text-3xl font-bold">{tecnico.resueltos_hoy}</div>
               <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Resueltos Hoy</div>
