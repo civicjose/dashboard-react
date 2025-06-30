@@ -1,9 +1,10 @@
-// Horas de inicio y fin de la jornada laboral
-const LABOR_DAY_START = 8;
-const LABOR_DAY_END = 18;
+// CAMBIO: Horario ajustado de 8:00 a 19:00
+const LABOR_DAY_START_HOUR = 8;
+const LABOR_DAY_END_HOUR = 19;
 
 /**
- * Calcula los minutos laborables (L-V, 8h-18h) entre dos fechas.
+ * CORRECCIÓN: Renombramos la función para que coincida con la importación.
+ * Calcula los minutos laborables (L-V, 8h-19h) entre dos fechas.
  * @param {Date} startDate - Fecha de inicio.
  * @param {Date} endDate - Fecha de fin.
  * @returns {number} - Total de minutos laborables.
@@ -17,16 +18,14 @@ export function calculateBusinessMinutes(startDate, endDate) {
   }
 
   let totalMinutes = 0;
-  const minutesInWorkDay = (LABOR_DAY_END - LABOR_DAY_START) * 60;
 
-  // Normalizar las fechas al horario laboral
   const getClampedDate = (date) => {
     const clamped = new Date(date);
-    if (clamped.getHours() < LABOR_DAY_START) {
-      clamped.setHours(LABOR_DAY_START, 0, 0, 0);
+    if (clamped.getHours() < LABOR_DAY_START_HOUR) {
+      clamped.setHours(LABOR_DAY_START_HOUR, 0, 0, 0);
     }
-    if (clamped.getHours() >= LABOR_DAY_END) {
-      clamped.setHours(LABOR_DAY_END, 0, 0, 0);
+    if (clamped.getHours() >= LABOR_DAY_END_HOUR) {
+      clamped.setHours(LABOR_DAY_END_HOUR, 0, 0, 0);
     }
     return clamped;
   };
@@ -38,13 +37,13 @@ export function calculateBusinessMinutes(startDate, endDate) {
 
   while (current < end) {
     const dayOfWeek = current.getDay();
-    // Si es día laborable (Lunes=1, Viernes=5)
+    // Si es día laborable (Lunes=1 a Viernes=5)
     if (dayOfWeek > 0 && dayOfWeek < 6) {
       const startOfDay = new Date(current);
-      startOfDay.setHours(LABOR_DAY_START, 0, 0, 0);
+      startOfDay.setHours(LABOR_DAY_START_HOUR, 0, 0, 0);
 
       const endOfDay = new Date(current);
-      endOfDay.setHours(LABOR_DAY_END, 0, 0, 0);
+      endOfDay.setHours(LABOR_DAY_END_HOUR, 0, 0, 0);
 
       const startIntersection = Math.max(current, startOfDay);
       const endIntersection = Math.min(end, endOfDay);
@@ -53,14 +52,13 @@ export function calculateBusinessMinutes(startDate, endDate) {
         totalMinutes += (endIntersection - startIntersection) / (1000 * 60);
       }
     }
-    // Avanzar al siguiente día
+    // Avanzar al inicio del siguiente día
     current.setDate(current.getDate() + 1);
-    current.setHours(LABOR_DAY_START, 0, 0, 0);
+    current.setHours(LABOR_DAY_START_HOUR, 0, 0, 0);
   }
 
   return Math.round(totalMinutes);
 }
-
 
 /**
  * Convierte un total de minutos a un formato de texto "Xh Ym".
@@ -68,7 +66,7 @@ export function calculateBusinessMinutes(startDate, endDate) {
  * @returns {string} - Cadena de texto formateada.
  */
 export function toHHMM(minutes) {
-  if (isNaN(minutes) || minutes === null || minutes < 0) return 'N/A';
+  if (isNaN(minutes) || minutes === null || minutes < 0) return '-';
   if (minutes === 0) return '0m';
 
   const h = Math.floor(minutes / 60);

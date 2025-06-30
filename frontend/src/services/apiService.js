@@ -1,11 +1,15 @@
 import axios from 'axios';
 
+// Esta línea lee la variable de tu archivo .env.
+// Si no la encuentra (por ejemplo, si estás en tu máquina y no has creado el .env),
+// usará localhost como plan B.
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+
 const apiClient = axios.create({
-  baseURL: 'http://localhost:3001/api',
+  baseURL: API_URL,
 });
 
-// Interceptor de PETICIÓN (Request): Añade el token a las cabeceras.
-// Este ya lo teníamos y está correcto.
+// Este interceptor añade el token a cada petición, está perfecto.
 apiClient.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -14,35 +18,22 @@ apiClient.interceptors.request.use(config => {
   return config;
 }, error => Promise.reject(error));
 
-
-// CAMBIO: Añadimos un interceptor de RESPUESTA (Response) para manejar errores 401.
+// Este interceptor maneja las sesiones expiradas, está perfecto.
 apiClient.interceptors.response.use(
-  // Si la respuesta es exitosa (2xx), simplemente la devolvemos.
   (response) => response,
-  
-  // Si la respuesta da un error...
   (error) => {
-    // Comprobamos si el error es porque la sesión ha expirado (error 401).
     if (error.response && error.response.status === 401) {
-      // Si es así, limpiamos el token del almacenamiento local.
       localStorage.removeItem('token');
-      // Y redirigimos al usuario a la página de login para que vuelva a entrar.
       window.location.href = '/'; 
-      // Devolvemos un error para que la petición original no continúe.
       return Promise.reject(new Error("Sesión expirada. Por favor, inicie sesión de nuevo."));
     }
-    
-    // Si es cualquier otro error, simplemente lo devolvemos para que sea manejado localmente.
     return Promise.reject(error);
   }
 );
-
 
 export const apiService = {
   login: (credentials) => apiClient.post('/auth/login', credentials),
   getDashboardData: (profile = 'all') => apiClient.get(`/dashboard?perfil=${profile}`),
   getIndicadores: (params) => apiClient.get('/indicadores', { params }),
-  // NUEVO: Función para obtener el detalle de un técnico
   getTecnicoDetalle: (id, desde, hasta) => apiClient.get(`/indicadores/tecnico/${id}`, { params: { desde, hasta } }),
 };
-
