@@ -29,9 +29,6 @@ function App() {
 
           <Route path="*" element={<Navigate to="/" />} /> 
         </Routes>
-        
-        {/* CAMBIO: Añadimos el componente Tooltip aquí. 
-            Le damos un id y un estilo base para el modo oscuro. */}
         <Tooltip 
           id="app-tooltip" 
           style={{ backgroundColor: "rgb(31 41 55)", color: "#fff" }}
