@@ -113,3 +113,67 @@ export async function getTicketDetailsByIds(ticketIds) {
     conn.release();
   }
 }
+
+export async function getTecnicoDetails(tecnicoId) {
+    const conn = await pool.getConnection();
+    try {
+        // 1. Cola de Trabajo
+        const [colaTrabajo] = await conn.query(
+          `SELECT COUNT(t.id) as total FROM glpi_tickets t
+           JOIN glpi_tickets_users tu ON t.id = tu.tickets_id AND tu.type = 2
+           WHERE tu.users_id = ? AND t.status IN (2, 3, 4) AND t.is_deleted = 0`,
+          [tecnicoId]
+        );
+
+        // 2. Último ticket resuelto
+        const [lastSolved] = await conn.query(
+          `SELECT id, solvedate FROM glpi_tickets
+           WHERE users_id_recipient = ? AND status IN (5, 6)
+           ORDER BY solvedate DESC LIMIT 1`,
+          [tecnicoId]
+        );
+
+        // 3. Tickets resueltos para buscar reaperturas
+        const [resolvedTickets] = await conn.query(
+          `SELECT t.id FROM glpi_tickets t
+           JOIN glpi_tickets_users tu ON t.id = tu.tickets_id AND tu.type = 2
+           WHERE tu.users_id = ? AND t.status IN (5, 6)`,
+          [tecnicoId]
+        );
+        const resolvedTicketIds = resolvedTickets.map(t => t.id);
+        
+        let reopenedData = { count: 0, ids: null };
+        if (resolvedTicketIds.length > 0) {
+          const [reopenedRows] = await conn.query(
+            `SELECT COUNT(DISTINCT l.items_id) as count, GROUP_CONCAT(DISTINCT l.items_id SEPARATOR ',') as ids
+             FROM glpi_logs l
+             WHERE l.itemtype = 'Ticket' AND l.id_search_option = 12
+               AND l.old_value IN ('5', '6') AND l.new_value IN ('1','2','3','4')
+               AND l.items_id IN (?)`,
+            [resolvedTicketIds]
+          );
+          if (reopenedRows.length > 0) {
+            reopenedData = reopenedRows[0];
+          }
+        }
+
+        // 4. Tendencia de resueltos en los últimos 7 días
+        const [dailyTrend] = await conn.query(
+            `SELECT DATE_FORMAT(t.solvedate, '%Y-%m-%d') as dia, COUNT(t.id) as total
+             FROM glpi_tickets t
+             JOIN glpi_tickets_users tu ON t.id = tu.tickets_id AND tu.type = 2
+             WHERE tu.users_id = ? AND DATE(t.solvedate) >= CURDATE() - INTERVAL 7 DAY
+             GROUP BY dia ORDER BY dia ASC`,
+             [tecnicoId]
+        );
+
+        return {
+            cola_actual: colaTrabajo[0].total || 0,
+            ultimo_resuelto: lastSolved[0] || null,
+            reabiertos: reopenedData,
+            dailyTrend,
+        };
+    } finally {
+        conn.release();
+    }
+}

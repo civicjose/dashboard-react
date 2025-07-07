@@ -1,5 +1,6 @@
 // CAMBIO: Importamos la nueva función del modelo
-import { getDashboardData, getTicketDetailsByIds } from '../models/dashboardModel.js';
+import { getDashboardData, getTicketDetailsByIds, getTecnicoDetails } from '../models/dashboardModel.js';
+import { param, validationResult } from 'express-validator';
 
 const PROFILE_MAP = {
   all: { profileIds: [5, 10], groupIds: [1, 2] },
@@ -31,3 +32,20 @@ export const getTicketDetailsApi = async (req, res, next) => {
         next(error);
     }
 };
+
+export const getTecnicoDetailsApi = [
+  param('id').isInt().withMessage('El ID del técnico debe ser un número.'),
+  async (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    try {
+      const { id } = req.params;
+      const data = await getTecnicoDetails(id);
+      res.json(data);
+    } catch (error) {
+      next(error);
+    }
+  }
+];

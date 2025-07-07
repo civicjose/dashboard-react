@@ -26,4 +26,6 @@ export const apiService = {
   getDashboardData: (profile = 'all') => apiClient.get(`/dashboard?perfil=${profile}`),
   getIndicadores: (params) => apiClient.get('/indicadores', { params }),
   getTicketDetails: (ids) => apiClient.post('/dashboard/ticket-details', { ids }),
+  getTecnicoDetails: (id) => apiClient.get(`/dashboard/tecnico/${id}`),
+
 };

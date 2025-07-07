@@ -68,16 +68,15 @@ const DashboardPage = () => {
           </section>
           <section>
             <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-200 mb-4">Desglose por Técnico</h2>
-            {data.tecnicos?.length > 0 ? ( <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">{data.tecnicos.map(t => <TechnicianCard key={t.user_id} tecnico={t} openTicketModal={openTicketModal} openTecnicoModal={openTecnicoModal} />)}</div> ) : ( <div className="text-center p-12 bg-white dark:bg-gray-800 rounded-lg shadow-sm"><p className="dark:text-gray-300">No hay técnicos para mostrar.</p></div>)}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+              {data.tecnicos.map(t => <TechnicianCard key={t.user_id} tecnico={t} openTicketModal={openTicketModal} openTecnicoModal={openTecnicoModal} />)}
+            </div>
           </section>
         </div>
       )}
-
-      <Modal isOpen={ticketModalInfo.isOpen} onClose={closeTicketModal} title={ticketModalInfo.title}>
-        <TicketDetailsTable ticketIds={ticketModalInfo.ticketIds} />
-      </Modal>
-      
+      <Modal isOpen={ticketModalInfo.isOpen} onClose={closeTicketModal} title={ticketModalInfo.title}><TicketDetailsTable ticketIds={ticketModalInfo.ticketIds} /></Modal>
       <TechnicianDetailsModal tecnico={selectedTecnico} onClose={closeTecnicoModal} openTicketModal={openTicketModal} />
+
     </div>
   );
 };
