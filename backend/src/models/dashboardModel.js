@@ -9,12 +9,16 @@ export async function getDashboardData(profileIds, groupIds) {
             SELECT
                 COUNT(DISTINCT CASE WHEN t.status = 2 AND (pu.profiles_id IN (?) OR gt.groups_id IN (?)) THEN t.id END) AS total_asignada,
                 GROUP_CONCAT(DISTINCT CASE WHEN t.status = 2 AND (pu.profiles_id IN (?) OR gt.groups_id IN (?)) THEN t.id END SEPARATOR ',') AS total_asignada_ids,
+                
                 COUNT(DISTINCT CASE WHEN t.status = 3 AND (pu.profiles_id IN (?) OR gt.groups_id IN (?)) THEN t.id END) AS total_en_proceso,
                 GROUP_CONCAT(DISTINCT CASE WHEN t.status = 3 AND (pu.profiles_id IN (?) OR gt.groups_id IN (?)) THEN t.id END SEPARATOR ',') AS total_en_proceso_ids,
+                
                 COUNT(DISTINCT CASE WHEN t.status = 4 AND (pu.profiles_id IN (?) OR gt.groups_id IN (?)) THEN t.id END) AS total_en_espera,
                 GROUP_CONCAT(DISTINCT CASE WHEN t.status = 4 AND (pu.profiles_id IN (?) OR gt.groups_id IN (?)) THEN t.id END SEPARATOR ',') AS total_en_espera_ids,
+
                 COUNT(DISTINCT CASE WHEN t.status = 5 AND DATE(t.solvedate) = CURDATE() AND (pu.profiles_id IN (?) OR gt.groups_id IN (?)) THEN t.id END) AS total_resueltos_hoy,
                 GROUP_CONCAT(DISTINCT CASE WHEN t.status = 5 AND DATE(t.solvedate) = CURDATE() AND (pu.profiles_id IN (?) OR gt.groups_id IN (?)) THEN t.id END SEPARATOR ',') AS total_resueltos_hoy_ids,
+                
                 (SELECT COUNT(id) FROM glpi_tickets WHERE status = 1 AND is_deleted = 0) AS total_no_asignada,
                 (SELECT GROUP_CONCAT(id SEPARATOR ',') FROM glpi_tickets WHERE status = 1 AND is_deleted = 0) AS total_no_asignada_ids,
                 (SELECT COUNT(DISTINCT t.id) FROM glpi_tickets t JOIN glpi_plugin_tag_tagitems tt ON t.id = tt.items_id AND tt.itemtype = 'Ticket' WHERE t.status IN (1,2,3,4) AND t.is_deleted = 0 AND tt.plugin_tag_tags_id = 5) AS total_internos,
@@ -41,6 +45,7 @@ export async function getDashboardData(profileIds, groupIds) {
             `
             SELECT
                 u.id AS user_id, u.firstname, u.realname AS lastname, u.picture AS profile_image,
+                u.phone, ue.email, -- Se añaden el teléfono y el email
                 COUNT(DISTINCT CASE WHEN t.status = 2 THEN t.id END) AS asignada,
                 GROUP_CONCAT(DISTINCT CASE WHEN t.status = 2 THEN t.id END SEPARATOR ',') AS asignada_ids,
                 COUNT(DISTINCT CASE WHEN t.status = 3 THEN t.id END) AS en_proceso,
@@ -60,8 +65,9 @@ export async function getDashboardData(profileIds, groupIds) {
             LEFT JOIN glpi_tickets_users tu ON tu.users_id = u.id AND tu.type = 2
             LEFT JOIN glpi_tickets t ON t.id = tu.tickets_id AND t.is_deleted = 0
             LEFT JOIN glpi_plugin_tag_tagitems tt ON tt.items_id = t.id AND tt.itemtype = 'Ticket'
+            LEFT JOIN glpi_useremails ue ON ue.users_id = u.id AND ue.is_default = 1 -- Se añade el JOIN a la tabla de emails
             WHERE u.is_active = 1 AND pu.profiles_id IN (?)
-            GROUP BY u.id, u.firstname, u.realname, u.picture
+            GROUP BY u.id, u.firstname, u.realname, u.picture, u.phone, ue.email
             ORDER BY u.firstname ASC
             `,
             [profileIds]
@@ -83,6 +89,7 @@ export async function getTicketDetailsByIds(ticketIds) {
         t.name AS titulo, 
         t.status,
         t.date AS fecha_creacion,
+        t.date_mod AS fecha_modificacion,
         g.completename AS grupo_asignado,
         (SELECT GROUP_CONCAT(DISTINCT u.firstname SEPARATOR ', ') 
          FROM glpi_tickets_users tu 
@@ -96,7 +103,7 @@ export async function getTicketDetailsByIds(ticketIds) {
       LEFT JOIN glpi_groups_tickets gt ON t.id = gt.tickets_id
       LEFT JOIN glpi_groups g ON gt.groups_id = g.id
       WHERE t.id IN (?) AND t.is_deleted = 0
-      GROUP BY t.id -- Agrupamos por ticket para consolidar los resultados
+      GROUP BY t.id
       ORDER BY t.id DESC
       `,
       [ticketIds]

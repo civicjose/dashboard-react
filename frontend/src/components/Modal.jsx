@@ -11,7 +11,7 @@ export const Modal = ({ isOpen, onClose, title, children }) => {
       onClick={onClose}
     >
       <div 
-        className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col transition-transform duration-300 scale-95 animate-scale-in"
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col transition-transform duration-300 scale-95 animate-scale-in"
         onClick={e => e.stopPropagation()}
       >
         <header className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
