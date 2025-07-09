@@ -24,6 +24,7 @@ const Layout = () => {
         <nav className="flex-1 px-2 py-4 space-y-2">
           <NavLink to="/dashboard" className={({ isActive }) => `${linkClasses} ${isActive ? activeLinkClasses : ''}`}>Dashboard</NavLink>
           <NavLink to="/indicadores" className={({ isActive }) => `${linkClasses} ${isActive ? activeLinkClasses : ''}`}>Indicadores</NavLink>
+          <NavLink to="/kpi" className={({ isActive }) => `${linkClasses} ${isActive ? activeLinkClasses : ''}`}> KPI</NavLink>
         </nav>
         
         {/* CAMBIO: Añadimos el botón para cambiar el tema */}

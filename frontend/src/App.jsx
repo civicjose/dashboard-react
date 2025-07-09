@@ -3,7 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
-import IndicadoresPage from './pages/IndicadoresPage'; 
+import IndicadoresPage from './pages/IndicadoresPage';
+import KpiPage from './pages/KpiPage';
 import Layout from './components/Layout';
 
 // CAMBIO: Importamos la librería y sus estilos
@@ -25,6 +26,7 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/indicadores" element={<IndicadoresPage />} />
+            <Route path="/kpi" element={<KpiPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" />} /> 

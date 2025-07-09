@@ -27,5 +27,5 @@ export const apiService = {
   getIndicadores: (params) => apiClient.get('/indicadores', { params }),
   getTicketDetails: (ids) => apiClient.post('/dashboard/ticket-details', { ids }),
   getTecnicoDetails: (id) => apiClient.get(`/dashboard/tecnico/${id}`),
-
+  getKpiReport: (params) => apiClient.get('/kpi', { params }),
 };

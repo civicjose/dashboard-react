@@ -5,6 +5,7 @@ import os from 'os';
 import { authRouter } from './routes/authRoutes.js';
 import { dashboardRouter } from './routes/dashboardRoutes.js';
 import { indicadoresRouter } from './routes/indicadoresRoutes.js';
+import { kpiRouter } from './routes/kpiRoutes.js';
 import { protect } from './middleware/authMiddleware.js';
 
 dotenv.config();
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use('/api/auth', authRouter);
 app.use('/api/dashboard', protect, dashboardRouter);
 app.use('/api/indicadores', protect, indicadoresRouter);
+app.use('/api/kpi', protect, kpiRouter)
 
 app.use((err, req, res, next) => {
   console.error("ERROR FINAL DETECTADO:", err);
